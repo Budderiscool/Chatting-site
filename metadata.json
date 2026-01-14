@@ -1,0 +1,5 @@
+{
+  "name": "Disclone Chat",
+  "description": "A feature-rich, Discord-inspired real-time chat application with administrative controls, announcement banners, reactions, and direct messaging.",
+  "requestFramePermissions": []
+}
