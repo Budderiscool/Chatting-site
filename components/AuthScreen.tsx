@@ -1,8 +1,13 @@
 
 import React, { useState } from 'react';
-import { supabase, SUPABASE_URL } from '../supabase';
+import { supabase } from '../supabase';
+import { Profile } from '../types';
 
-export const AuthScreen: React.FC = () => {
+interface AuthScreenProps {
+  onAuthSuccess: (profile: Profile) => void;
+}
+
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -14,42 +19,52 @@ export const AuthScreen: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Supabase needs an email, so we derive a pseudo-email from username
-    const email = `${username.toLowerCase().trim()}@disclone.local`;
-
     try {
       if (isLogin) {
-        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInErr) throw signInErr;
+        // Query the profiles table directly
+        const { data, error: loginError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('username', username.trim())
+          .eq('password', password)
+          .single();
+
+        if (loginError || !data) {
+          throw new Error("Invalid username or password");
+        }
+
+        onAuthSuccess(data);
       } else {
-        const { data, error: signUpError } = await supabase.auth.signUp({ 
-          email, 
-          password,
-          options: {
-            data: { username }
-          }
-        });
+        // Check if username already exists
+        const { data: existingUser } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', username.trim())
+          .maybeSingle();
+
+        if (existingUser) {
+          throw new Error("Username already taken");
+        }
+
+        // Create new profile directly in the table
+        const { data: newUser, error: signUpError } = await supabase
+          .from('profiles')
+          .insert([{ 
+            username: username.trim(), 
+            password: password, 
+            is_admin: false 
+          }])
+          .select()
+          .single();
         
         if (signUpError) throw signUpError;
-        
-        // After signup, manually insert into the profiles table
-        if (data.user) {
-          const { error: profileError } = await supabase.from('profiles').upsert([
-            { id: data.user.id, username, is_admin: false }
-          ], { onConflict: 'id' });
-          
-          if (profileError) {
-            console.error("Profile creation error:", profileError);
-          }
+        if (newUser) {
+          onAuthSuccess(newUser);
         }
       }
     } catch (err: any) {
       console.error("Auth error details:", err);
-      if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-        setError(`Network Error: Browser could not reach the database. Please verify your Supabase URL and Keys.`);
-      } else {
-        setError(err.message || "An unexpected error occurred");
-      }
+      setError(err.message || "An unexpected error occurred during authentication.");
     } finally {
       setLoading(false);
     }
@@ -65,7 +80,7 @@ export const AuthScreen: React.FC = () => {
              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">{isLogin ? 'Welcome Back!' : 'Create an Account'}</h2>
-          <p className="text-[#b5bac1]">{isLogin ? 'We\'re so excited to see you again!' : 'Join the Disclone community today.'}</p>
+          <p className="text-[#b5bac1]">{isLogin ? 'Log in with your username' : 'Join the Disclone community today.'}</p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-6">

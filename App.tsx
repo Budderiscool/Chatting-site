@@ -8,29 +8,19 @@ import { AnnouncementBanner } from './components/AnnouncementBanner';
 import { Profile, ViewState, Announcement } from './types';
 
 export default function App() {
-  const [session, setSession] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewState | null>(null);
   const [activeAnnouncements, setActiveAnnouncements] = useState<Announcement[]>([]);
 
+  // Custom session check on mount
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) fetchProfile(session.user.id);
-      else {
-        setUserProfile(null);
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    const savedUserId = localStorage.getItem('disclone_user_id');
+    if (savedUserId) {
+      fetchProfile(savedUserId);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const fetchProfile = async (userId: string) => {
@@ -42,24 +32,43 @@ export default function App() {
 
     if (data) {
       setUserProfile(data);
+      localStorage.setItem('disclone_user_id', data.id);
+    } else {
+      localStorage.removeItem('disclone_user_id');
     }
     setLoading(false);
   };
 
+  const handleLoginSuccess = (profile: Profile) => {
+    setUserProfile(profile);
+    localStorage.setItem('disclone_user_id', profile.id);
+  };
+
+  const handleLogout = () => {
+    setUserProfile(null);
+    localStorage.removeItem('disclone_user_id');
+    setView(null);
+  };
+
   const fetchAnnouncements = useCallback(async () => {
-    const now = new Date().toISOString();
-    const { data } = await supabase
-      .from('announcements')
-      .select('*')
-      .lte('starts_at', now)
-      .gte('ends_at', now);
-    
-    if (data) setActiveAnnouncements(data);
+    // Note: Table might not exist yet if not set up, wrapping in try/catch or checking data
+    try {
+      const now = new Date().toISOString();
+      const { data } = await supabase
+        .from('announcements')
+        .select('*')
+        .lte('starts_at', now)
+        .gte('ends_at', now);
+      
+      if (data) setActiveAnnouncements(data);
+    } catch (e) {
+      console.log("Announcements table might not be ready.");
+    }
   }, []);
 
   useEffect(() => {
     fetchAnnouncements();
-    const interval = setInterval(fetchAnnouncements, 60000); // Check every minute
+    const interval = setInterval(fetchAnnouncements, 60000);
     return () => clearInterval(interval);
   }, [fetchAnnouncements]);
 
@@ -71,8 +80,8 @@ export default function App() {
     );
   }
 
-  if (!session) {
-    return <AuthScreen />;
+  if (!userProfile) {
+    return <AuthScreen onAuthSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -92,6 +101,7 @@ export default function App() {
           userProfile={userProfile} 
           currentView={view}
           onViewChange={setView}
+          onLogout={handleLogout}
         />
 
         {/* Main Content */}
@@ -99,7 +109,7 @@ export default function App() {
           {view ? (
             <ChatPanel 
               view={view} 
-              userProfile={userProfile!} 
+              userProfile={userProfile} 
             />
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-[#313338]">

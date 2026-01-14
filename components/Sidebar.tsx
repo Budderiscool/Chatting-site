@@ -7,9 +7,10 @@ interface SidebarProps {
   userProfile: Profile | null;
   currentView: ViewState | null;
   onViewChange: (view: ViewState) => void;
+  onLogout: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ userProfile, currentView, onViewChange }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ userProfile, currentView, onViewChange, onLogout }) => {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isChannelModalOpen, setIsChannelModalOpen] = useState(false);
@@ -58,8 +59,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ userProfile, currentView, onVi
       setIsChannelModalOpen(false);
     }
   };
-
-  const logout = () => supabase.auth.signOut();
 
   return (
     <div className="w-64 bg-[#2b2d31] flex flex-col h-full border-r border-[#1e1f22]">
@@ -148,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userProfile, currentView, onVi
           <p className="text-xs text-[#b5bac1] truncate">Online</p>
         </div>
         <button 
-          onClick={logout}
+          onClick={onLogout}
           className="p-1.5 hover:bg-[#35373c] rounded text-[#b5bac1] hover:text-[#dbdee1] transition-colors"
           title="Logout"
         >
