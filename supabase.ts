@@ -11,5 +11,5 @@ export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KE
 export const isConfigured = () => {
   return SUPABASE_URL !== 'https://hbruisbnvuglgqvsbhfc.supabase.co' && SUPABASE_ANON_KEY !== 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhicnVpc2JudnVnbGdxdnNiaGZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNTMyMDgsImV4cCI6MjA4MzkyOTIwOH0.vJgICTx8lnYlS7foirQGip03PxPXFfb5KTSySR2w6wg';
 };
-
+// h
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
