@@ -1,15 +1,24 @@
-# Disclone Chat - Custom Table Auth Schema
+# Disclone Chat - Database Setup
 
-This document outlines the schema for using a custom `profiles` table for authentication instead of Supabase's built-in Auth service.
+To fix the "relation already exists" error, copy and paste the entire block below into your Supabase SQL Editor. This will reset the tables and ensure they match the application logic exactly.
 
-## 1. Tables
+## 1. Complete Schema Reset
 
 ```sql
+-- 1. DROP EXISTING TABLES (Clean start)
+DROP TABLE IF EXISTS public.announcements;
+DROP TABLE IF EXISTS public.reactions;
+DROP TABLE IF EXISTS public.messages;
+DROP TABLE IF EXISTS public.channels;
+DROP TABLE IF EXISTS public.profiles;
+
+-- 2. CREATE TABLES
+
 -- Profiles table (Acts as our Users table)
 CREATE TABLE public.profiles (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL, -- Stored as text for this implementation
+  password TEXT NOT NULL, -- Stored as text for simplicity
   is_admin BOOLEAN DEFAULT FALSE,
   avatar_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -22,7 +31,7 @@ CREATE TABLE public.channels (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   description TEXT,
-  created_by UUID REFERENCES public.profiles(id),
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -30,7 +39,7 @@ CREATE TABLE public.channels (
 CREATE TABLE public.messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   content TEXT NOT NULL,
-  author_id UUID REFERENCES public.profiles(id) NOT NULL,
+  author_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
   channel_id UUID REFERENCES public.channels(id) ON DELETE CASCADE,
   recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
   reply_to_id UUID REFERENCES public.messages(id) ON DELETE SET NULL,
@@ -55,21 +64,35 @@ CREATE TABLE public.reactions (
   
   UNIQUE(message_id, user_id, emoji)
 );
-```
 
-## 2. Row Level Security (RLS) Warning
+-- Announcements table (Required for App.tsx)
+CREATE TABLE public.announcements (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  content TEXT NOT NULL,
+  starts_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  ends_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
-Since we are bypassing Supabase Auth, `auth.uid()` will not be populated. 
-For testing and simple custom auth, you should **disable RLS** or use a policy that allows all authenticated-like traffic.
-
-**To disable RLS for testing:**
-```sql
+-- 3. DISABLE RLS (For easier testing with custom auth)
 ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.channels DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reactions DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.announcements DISABLE ROW LEVEL SECURITY;
+
+-- 4. INSERT INITIAL DATA (Optional)
+INSERT INTO public.channels (name) VALUES ('general'), ('random'), ('dev-talk');
 ```
 
-## 3. Realtime
+## 2. Realtime Setup
+1. Go to **Database** -> **Replication** in Supabase.
+2. Click on **'supabase_realtime'** (or create it).
+3. Toggle on the tables: `messages`, `channels`, `profiles`, and `reactions`.
 
-Enable Realtime for `messages`, `channels`, and `profiles` in the Supabase Dashboard (Database -> Replication).
+## 3. Creating an Admin
+To create an admin user, register normally in the app, then run this in the SQL editor:
+```sql
+UPDATE public.profiles SET is_admin = TRUE WHERE username = 'YOUR_USERNAME';
+```

@@ -24,19 +24,24 @@ export default function App() {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    if (data) {
-      setUserProfile(data);
-      localStorage.setItem('disclone_user_id', data.id);
-    } else {
+      if (data && !error) {
+        setUserProfile(data);
+        localStorage.setItem('disclone_user_id', data.id);
+      } else {
+        localStorage.removeItem('disclone_user_id');
+      }
+    } catch (err) {
       localStorage.removeItem('disclone_user_id');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLoginSuccess = (profile: Profile) => {
@@ -51,7 +56,6 @@ export default function App() {
   };
 
   const fetchAnnouncements = useCallback(async () => {
-    // Note: Table might not exist yet if not set up, wrapping in try/catch or checking data
     try {
       const now = new Date().toISOString();
       const { data } = await supabase
@@ -62,7 +66,7 @@ export default function App() {
       
       if (data) setActiveAnnouncements(data);
     } catch (e) {
-      console.log("Announcements table might not be ready.");
+      // Fail silently if table doesn't exist yet
     }
   }, []);
 
