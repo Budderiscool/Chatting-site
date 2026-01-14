@@ -1,10 +1,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// These would normally be environment variables
-// In this simulated environment, we assume process.env.SUPABASE_URL and SUPABASE_ANON_KEY might be available 
-// or replaced by the runtime.
-const supabaseUrl = (window as any)._env_?.SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = (window as any)._env_?.SUPABASE_ANON_KEY || 'your-anon-key';
+// Vite uses import.meta.env for environment variables.
+// Fallback to window._env_ for legacy/container environments or placeholders for local dev.
+// Fix: Use type casting to access Vite's environment variables without TypeScript errors
+export const SUPABASE_URL = (import.meta as any).env?.VITE_SUPABASE_URL || (window as any)._env_?.SUPABASE_URL || 'https://your-project.supabase.co';
+// Fix: Use type casting to access Vite's environment variables without TypeScript errors
+export const SUPABASE_ANON_KEY = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY || (window as any)._env_?.SUPABASE_ANON_KEY || 'your-anon-key';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const isConfigured = () => {
+  return SUPABASE_URL !== 'https://your-project.supabase.co' && SUPABASE_ANON_KEY !== 'your-anon-key';
+};
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
