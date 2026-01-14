@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { supabase, isConfigured, SUPABASE_URL } from '../supabase';
+import { supabase, SUPABASE_URL } from '../supabase';
 
 export const AuthScreen: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -9,15 +9,8 @@ export const AuthScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const configured = isConfigured();
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!configured) {
-      setError("Supabase is not configured. Please check supabase.ts or your environment variables.");
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -26,8 +19,8 @@ export const AuthScreen: React.FC = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInErr) throw signInErr;
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({ 
           email, 
@@ -39,7 +32,7 @@ export const AuthScreen: React.FC = () => {
         
         if (signUpError) throw signUpError;
         
-        // After signup, manually insert into the profiles table if it wasn't handled by a trigger
+        // After signup, manually insert into the profiles table
         if (data.user) {
           const { error: profileError } = await supabase.from('profiles').upsert([
             { id: data.user.id, username, is_admin: false }
@@ -47,17 +40,15 @@ export const AuthScreen: React.FC = () => {
           
           if (profileError) {
             console.error("Profile creation error:", profileError);
-            // We don't throw here because the user is still technically "signed up" 
-            // and can fix their profile later.
           }
         }
       }
     } catch (err: any) {
-      console.error("Auth error:", err);
+      console.error("Auth error details:", err);
       if (err.message === 'Failed to fetch' || err.name === 'TypeError') {
-        setError(`Connection failed. Is '${SUPABASE_URL}' reachable?`);
+        setError(`Network Error: Browser could not reach the database. Please verify your Supabase URL and Keys.`);
       } else {
-        setError(err.message);
+        setError(err.message || "An unexpected error occurred");
       }
     } finally {
       setLoading(false);
@@ -69,16 +60,6 @@ export const AuthScreen: React.FC = () => {
       <div className="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
       
       <div className="relative z-10 w-full max-w-md p-8 bg-[#313338] rounded-lg shadow-2xl border border-white/5">
-        {!configured && (
-          <div className="mb-6 p-3 bg-amber-500/10 border border-amber-500/50 rounded flex items-start space-x-3">
-             <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-             <div className="text-xs text-amber-200">
-               <p className="font-bold mb-1 uppercase tracking-wider">Configuration Required</p>
-               <p>Update <code>supabase.ts</code> with your project URL and Anon Key to enable authentication.</p>
-             </div>
-          </div>
-        )}
-
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-500 rounded-2xl mb-4 shadow-lg">
              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z" /></svg>
@@ -112,15 +93,15 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm flex items-center">
-               <svg className="w-4 h-4 mr-2 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-               {error}
+            <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm flex items-start">
+               <svg className="w-4 h-4 mr-2 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               <span>{error}</span>
             </div>
           )}
 
           <button
             type="submit"
-            disabled={loading || !configured}
+            disabled={loading}
             className="w-full py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-medium rounded transition-all transform active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
